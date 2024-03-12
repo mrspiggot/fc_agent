@@ -3,7 +3,7 @@ This module provides a set of classes for processing documents, building vector 
 and generating articles using AI models within a Streamlit UI. These classes write an
 initial article based on a user supplied style guide and user content. This article is
 then read by an LLM to see what enhancements can be made to it by sourcing additional
-materials from the web. Finaly to avoid problems with hallucinations a further LLM is
+materials from the web. Finally to avoid problems with hallucinations a further LLM is
 deployed to fact-check the enhanced article. This fact checking LLM returns a link to
 the corroborating article along with the corroborating article's title.
 """
@@ -15,9 +15,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_community.utilities import BingSearchAPIWrapper
-from langchain.agents import AgentExecutor, create_react_agent
+from langchain.agents import AgentExecutor, create_react_agent, create_openai_functions_agent
 from langchain import hub
 from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_anthropic import AnthropicLLM
 import time
 import pprint
 import tempfile
@@ -259,20 +260,21 @@ class LuciArticleGenerator:
 
 class LuciArticleEnhancer:
     def __init__(self, ui_controller):
-        self.llm = OpenAI()
+        self.llm = AnthropicLLM(model="claude-2.1", anthropic_api_key=AHNTHROPIC_API_KEY)
         self.tools = [TavilySearchResults(max_results=1)]
         self.ui = ui_controller
         self.enh_prompt = hub.pull("hwchase17/react")
         self.agent = create_react_agent(self.llm, self.tools, self.enh_prompt)
-        self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
+        self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True, handle_parsing_error=True)
 
     def suggest_enhancements(self, article):
         article_retriever = LuciVectorStoreManager(article).build_vectorstore()
         enh_model = ChatOpenAI(model=self.ui.selected_model)
-        enh_prompt = ChatPromptTemplate.from_template('''Given this article {article} return a python tuple containing five strings. Each string is a possible enhancement for the article. Each string should be phrased as a direct question to pose to an article enhancing AI agent. Each question should start with the phrase "Provide a detailed " or "Provide an in-depth" or similar phrase.''')
+        enh_prompt = ChatPromptTemplate.from_template('''Given this article {article} return a python tuple containing five strings. Each string is a possible enhancement for the article. Each string should be phrased as a direct question to pose to an article enhancing AI agent. Each question should start with the phrase "Provide a detailed analysis " or "Provide an in-depth review" or similar phrase. ''')
         enh_chain = ({"article": article_retriever} | enh_prompt | enh_model | StrOutputParser()).invoke("Please fact-check this article")
-        # st.write(fc_chain)
+        # st.write(enh_chain, type(enh_chain))
         result_chain = ast.literal_eval(enh_chain)
+        # st.write(result_chain, type(result_chain))
         n=1
         for question in result_chain:
             st.write(f"{n}. {question}")
@@ -285,7 +287,15 @@ class LuciArticleEnhancer:
         st.title("Additional Detail:")
         appendix=""
         for question in questions:
-            enhancement_info = self.agent_executor.invoke({"input": question})
+            print(f"************\n************\n************\n{question}\n************\n************\n************\n")
+            try:
+                enhancement_info = self.agent_executor.invoke({"input": f"{question}"}, handle_parsing_error=False)
+            except Exception as e:
+                llm = OpenAI()
+                self.agent = create_react_agent(llm, self.tools, self.enh_prompt)
+                self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True,
+                                                    handle_parsing_error=True)
+                enhancement_info = self.agent_executor.invoke({"input": f"{question}"}, handle_parsing_error=False)
             article += f"\n\n{enhancement_info['output']}"
             appendix += f"\n\n{enhancement_info['input']}\n\n{enhancement_info['output']}"
 
@@ -302,6 +312,7 @@ if __name__ == "__main__":
     BING_SUBSCRIPTION_KEY = os.getenv("BING_SUBSCRIPTION_KEY")
     BING_SEARCH_URL = os.getenv("BING_SEARCH_URL")
     TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+    AHNTHROPIC_API_KEY = os.getenv("AHNTHROPIC_API_KEY")
 
     ui_controller = LuciUIController()
     article_generator = LuciArticleGenerator(ui_controller)
