@@ -12,7 +12,7 @@ import streamlit as st
 from langchain.document_loaders import PyPDFLoader
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings, OpenAI
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_community.utilities import BingSearchAPIWrapper
 from langchain.agents import AgentExecutor, create_react_agent, create_openai_functions_agent
@@ -260,18 +260,24 @@ class LuciArticleGenerator:
 
 class LuciArticleEnhancer:
     def __init__(self, ui_controller):
-        self.llm = AnthropicLLM(model="claude-2.1", anthropic_api_key=AHNTHROPIC_API_KEY)
+        self.llm = AnthropicLLM(model="claude-3", anthropic_api_key=AHNTHROPIC_API_KEY)
         self.tools = [TavilySearchResults(max_results=1)]
         self.ui = ui_controller
         self.enh_prompt = hub.pull("hwchase17/react")
+        old_part = "Final Answer: the final answer to the original input question"
+        # New string to insert
+        new_part = "Final Answer: the final answer to the original input question using exactly three paragraphs. You are a financial journalist whose audience is asset managers. Provide your answer as though you are writing an analyst report for your top tier clients."
+        self.enh_prompt.template = self.enh_prompt.template.replace(old_part, new_part)
+
+        print(type(self.enh_prompt.template), self.enh_prompt.template)
         self.agent = create_react_agent(self.llm, self.tools, self.enh_prompt)
         self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True, handle_parsing_error=True)
 
     def suggest_enhancements(self, article):
         article_retriever = LuciVectorStoreManager(article).build_vectorstore()
         enh_model = ChatOpenAI(model=self.ui.selected_model)
-        enh_prompt = ChatPromptTemplate.from_template('''Given this article {article} return a python tuple containing five strings. Each string is a possible enhancement for the article. Each string should be phrased as a direct question to pose to an article enhancing AI agent. Each question should start with the phrase "Provide a detailed analysis " or "Provide an in-depth review" or similar phrase. ''')
-        enh_chain = ({"article": article_retriever} | enh_prompt | enh_model | StrOutputParser()).invoke("Please fact-check this article")
+        enh_prompt = ChatPromptTemplate.from_template('''Given this article {article} return a python tuple containing five strings. Each string is a possible enhancement for the article. Each string should be phrased as a direct question to pose to an article enhancing AI agent. Each question should start with the phrase "Provide a detailed analysis " or "Provide an in-depth review " or similar phrase. ''')
+        enh_chain = ({"article": article_retriever} | enh_prompt | enh_model | StrOutputParser()).invoke("Please answer this question.")
         # st.write(enh_chain, type(enh_chain))
         result_chain = ast.literal_eval(enh_chain)
         # st.write(result_chain, type(result_chain))
@@ -287,7 +293,7 @@ class LuciArticleEnhancer:
         st.title("Additional Detail:")
         appendix=""
         for question in questions:
-            print(f"************\n************\n************\n{question}\n************\n************\n************\n")
+            # print(f"************\n************\n************\n{question}\n************\n************\n************\n")
             try:
                 enhancement_info = self.agent_executor.invoke({"input": f"{question}"}, handle_parsing_error=False)
             except Exception as e:
