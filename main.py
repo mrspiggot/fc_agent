@@ -3,7 +3,7 @@ This module provides a set of classes for processing documents, building vector 
 and generating articles using AI models within a Streamlit UI. These classes write an
 initial article based on a user supplied style guide and user content. This article is
 then read by an LLM to see what enhancements can be made to it by sourcing additional
-materials from the web. Finally to avoid problems with hallucinations a further LLM is
+materials from the web. Finaly to avoid problems with hallucinations a further LLM is
 deployed to fact-check the enhanced article. This fact checking LLM returns a link to
 the corroborating article along with the corroborating article's title.
 """
