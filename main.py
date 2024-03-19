@@ -265,11 +265,11 @@ class LuciArticleEnhancer:
         self.ui = ui_controller
         self.enh_prompt = hub.pull("hwchase17/react")
         old_part = "Final Answer: the final answer to the original input question"
-        # New string to insert
+
         new_part = "Final Answer: the final answer to the original input question using exactly three paragraphs. You are a financial journalist whose audience is asset managers. Provide your answer as though you are writing an analyst report for your top tier clients."
         self.enh_prompt.template = self.enh_prompt.template.replace(old_part, new_part)
 
-        print(type(self.enh_prompt.template), self.enh_prompt.template)
+
         self.agent = create_react_agent(self.llm, self.tools, self.enh_prompt)
         self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True, handle_parsing_error=True)
 
