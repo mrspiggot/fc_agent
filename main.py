@@ -18,7 +18,7 @@ from langchain_community.utilities import BingSearchAPIWrapper
 from langchain.agents import AgentExecutor, create_react_agent, create_openai_functions_agent
 from langchain import hub
 from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_anthropic import AnthropicLLM
+from langchain_anthropic import AnthropicLLM, ChatAnthropic
 import time
 import pprint
 import tempfile
@@ -186,7 +186,8 @@ class LuciUIController:
         Initializes the LuciUIController, setting up the UI components.
         """
         self.sidebar = st.sidebar
-        self.model_options = ["gpt-4", "gpt-3.5-turbo-0613", "Gemini", "Luci-FT-Gen", "Claude2"]
+        self.model_options = ["gpt-4", "gpt-3.5-turbo-0613", "Gemini", "Luci-FT-Gen", "Claude3", "gpt-4-1106-preview"]
+
         self.latest_news_option = None
         self.setup_ui()
 
@@ -246,7 +247,7 @@ class LuciArticleGenerator:
         prompt = ChatPromptTemplate.from_template(self.ui.prompt_text)
 
         # Initialize the ChatOpenAI model using the selected AI model from the UI.
-        model = ChatOpenAI(model=self.ui.selected_model)
+        model = ChatOpenAI(model='gpt-4-1106-preview', openai_api_key=OPENAI_API_KEY)
 
         # Build a chain of operations using LangChain Expression Language (LCEL).
         # This chain combines the context from source_retriever, the style from style_retriever,
@@ -260,7 +261,7 @@ class LuciArticleGenerator:
 
 class LuciArticleEnhancer:
     def __init__(self, ui_controller):
-        self.llm = AnthropicLLM(model="claude-3", anthropic_api_key=AHNTHROPIC_API_KEY)
+        self.llm = ChatOpenAI(model="claude-3-opus-20240229'", openai_api_key_api_key=OPENAI_API_KEY)
         self.tools = [TavilySearchResults(max_results=1)]
         self.ui = ui_controller
         self.enh_prompt = hub.pull("hwchase17/react")
